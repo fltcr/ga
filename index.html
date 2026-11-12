@@ -1,0 +1,259 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Arcade Hub</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:wght@400;600;800&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#0e2a47; --panel:#143a60; --line:#2a5b8c; --text:#eef5ff; --mute:#9db8d6; --accent:#ff6b57; --ok:#6fe3b0;
+  color-scheme:dark;
+}
+@media (prefers-color-scheme:light){
+  :root{--bg:#eaf3ff; --panel:#ffffff; --line:#b8d0ea; --text:#0e2a47; --mute:#4a6a8c; --accent:#d9432f; --ok:#12805a; color-scheme:light;}
+}
+*{box-sizing:border-box}
+html,body{height:100%}
+body{margin:0;background:var(--bg);color:var(--text);font-family:"Bricolage Grotesque",system-ui,sans-serif;display:grid;grid-template-columns:230px 1fr;grid-template-rows:1fr}
+nav{background:var(--panel);border-right:1px solid var(--line);padding:18px 14px;display:flex;flex-direction:column;gap:6px;overflow-y:auto}
+nav h1{font-size:1.5rem;font-weight:800;margin:0 0 14px;letter-spacing:-.02em}
+nav button.tab{all:unset;cursor:pointer;padding:10px 12px;border-radius:10px;font-weight:600;color:var(--mute)}
+nav button.tab:hover{color:var(--text)}
+nav button.tab[aria-selected="true"]{background:var(--accent);color:#fff}
+nav .spacer{flex:1}
+button.act{cursor:pointer;border:1px solid var(--line);background:transparent;color:var(--text);padding:10px 12px;border-radius:10px;font:inherit;font-weight:600;text-align:left}
+button.act:hover{border-color:var(--accent)}
+:focus-visible{outline:3px solid var(--ok);outline-offset:2px}
+main{display:flex;flex-direction:column;min-width:0;min-height:0}
+.bar{display:flex;gap:8px;padding:12px;border-bottom:1px solid var(--line);flex-wrap:wrap}
+.bar input{flex:1;min-width:180px;padding:10px 12px;border-radius:10px;border:1px solid var(--line);background:var(--panel);color:var(--text);font:inherit}
+.bar button{cursor:pointer;border:0;background:var(--accent);color:#fff;padding:10px 16px;border-radius:10px;font:inherit;font-weight:600}
+.view{flex:1;min-height:0;overflow:auto;padding:16px;display:none}
+.view.on{display:block}
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(170px,1fr));gap:12px}
+.tile{cursor:pointer;background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:18px 14px;min-height:96px;font:inherit;color:var(--text);text-align:left;font-weight:600}
+.tile:hover{border-color:var(--accent)}
+.tile small{display:block;color:var(--mute);font-weight:400;margin-top:4px}
+.stage{position:fixed;inset:0;background:var(--bg);display:none;flex-direction:column;z-index:10}
+.stage.on{display:flex}
+.stage .top{display:flex;gap:8px;padding:10px;background:var(--panel);border-bottom:1px solid var(--line)}
+.stage iframe{flex:1;border:0;width:100%;background:#000}
+.embed{width:100%;aspect-ratio:16/9;max-height:70vh;border:0;border-radius:12px;background:#000}
+.note{color:var(--mute);font-size:.9rem;max-width:62ch}
+h2{margin:0 0 12px}
+@media (max-width:720px){
+  body{grid-template-columns:1fr;grid-template-rows:auto 1fr}
+  nav{flex-direction:row;flex-wrap:wrap;border-right:0;border-bottom:1px solid var(--line)}
+  nav h1{width:100%;margin-bottom:4px}
+  nav .spacer{display:none}
+}
+</style>
+</head>
+<body>
+<nav aria-label="Sections">
+  <h1>Arcade Hub</h1>
+  <button class="tab" data-v="games" aria-selected="true">Games</button>
+  <button class="tab" data-v="video" aria-selected="false">YouTube</button>
+  <button class="tab" data-v="music" aria-selected="false">Spotify</button>
+  <button class="tab" data-v="apps" aria-selected="false">Apps</button>
+  <button class="tab" data-v="url" aria-selected="false">Open a URL</button>
+  <div class="spacer"></div>
+  <button class="act" id="popout">Open in about:blank</button>
+  <button class="act" id="cloak">Rename this tab</button>
+</nav>
+
+<main>
+  <section class="view on" id="games">
+    <h2>Games</h2>
+    <p class="note">Each tile loads a game hosted in this repo under /games/. Add yours to the GAMES list in this file.</p>
+    <div class="grid" id="gameGrid"></div>
+  </section>
+
+  <section class="view" id="video">
+    <div class="bar" style="margin:-16px -16px 16px">
+      <input id="ytIn" placeholder="Paste a YouTube video or playlist link" aria-label="YouTube link">
+      <button id="ytGo">Play</button>
+    </div>
+    <iframe id="ytFrame" class="embed" allow="autoplay; encrypted-media; picture-in-picture; fullscreen" allowfullscreen title="YouTube player"></iframe>
+  </section>
+
+  <section class="view" id="music">
+    <div class="bar" style="margin:-16px -16px 16px">
+      <input id="spIn" placeholder="Paste a Spotify playlist, album, track or podcast link" aria-label="Spotify link">
+      <button id="spGo">Load</button>
+    </div>
+    <iframe id="spFrame" style="width:100%;height:480px;border:0;border-radius:12px" allow="autoplay; clipboard-write; encrypted-media; fullscreen; picture-in-picture" title="Spotify player"></iframe>
+  </section>
+
+  <section class="view" id="apps">
+    <h2>Apps</h2>
+    <p class="note">Sites that allow embedding open inside the hub. Sites that refuse to be framed will show a blank or error panel; use the new tab button on the viewer for those.</p>
+    <div class="grid" id="appGrid"></div>
+    <h2 style="margin-top:24px">Add an app</h2>
+    <div class="bar" style="padding:0;border:0">
+      <input id="appName" placeholder="Name" aria-label="App name" style="max-width:200px">
+      <input id="appUrl" placeholder="https://example.com" aria-label="App URL">
+      <button id="appAdd">Save</button>
+    </div>
+  </section>
+
+  <section class="view" id="url">
+    <div class="bar" style="margin:-16px -16px 16px">
+      <input id="urlIn" placeholder="https://..." aria-label="Address">
+      <button id="urlGo">Open</button>
+    </div>
+    <p class="note">Opens the address in the viewer. Any site that sets frame restrictions will not display here.</p>
+  </section>
+</main>
+
+<div class="stage" id="stage" role="dialog" aria-label="Viewer">
+  <div class="top">
+    <button class="act" id="stClose">Close</button>
+    <button class="act" id="stFull">Fullscreen</button>
+    <button class="act" id="stTab">New tab</button>
+    <span id="stTitle" style="align-self:center;font-weight:600"></span>
+  </div>
+  <iframe id="stFrame" allow="fullscreen; autoplay; gamepad; clipboard-write" allowfullscreen title="Viewer"></iframe>
+</div>
+
+<script>
+// ---- edit these ----
+const GAMES = [
+  // { name: "2048", url: "games/2048/index.html", note: "puzzle" },
+  { name: "Example game", url: "games/example/index.html", note: "replace me" }
+];
+const DEFAULT_APPS = [
+  { name: "Wikipedia", url: "https://en.wikipedia.org" },
+  { name: "Excalidraw", url: "https://excalidraw.com" },
+  { name: "Photopea", url: "https://www.photopea.com" }
+];
+// --------------------
+
+const $ = s => document.querySelector(s);
+const store = {
+  get(k, d){ try { const v = localStorage.getItem(k); return v ? JSON.parse(v) : d; } catch(e){ return d; } },
+  set(k, v){ try { localStorage.setItem(k, JSON.stringify(v)); } catch(e){} }
+};
+
+// tabs
+document.querySelectorAll(".tab").forEach(b => b.addEventListener("click", () => show(b.dataset.v)));
+function show(id){
+  document.querySelectorAll(".view").forEach(v => v.classList.toggle("on", v.id === id));
+  document.querySelectorAll(".tab").forEach(t => t.setAttribute("aria-selected", t.dataset.v === id));
+}
+
+// viewer
+let currentUrl = "";
+function openViewer(url, title){
+  currentUrl = url;
+  $("#stFrame").src = url;
+  $("#stTitle").textContent = title || url;
+  $("#stage").classList.add("on");
+}
+$("#stClose").onclick = () => { $("#stage").classList.remove("on"); $("#stFrame").src = "about:blank"; };
+$("#stFull").onclick = () => { const f = $("#stFrame"); (f.requestFullscreen || f.webkitRequestFullscreen || function(){}).call(f); };
+$("#stTab").onclick = () => window.open(currentUrl, "_blank", "noopener");
+
+function normalize(u){
+  u = u.trim();
+  if (!u) return "";
+  if (!/^https?:\/\//i.test(u) && !u.startsWith("games/")) u = "https://" + u;
+  return u;
+}
+
+// games
+GAMES.forEach(g => {
+  const t = document.createElement("button");
+  t.className = "tile";
+  t.innerHTML = "<span></span><small></small>";
+  t.firstChild.textContent = g.name;
+  t.lastChild.textContent = g.note || "";
+  t.onclick = () => openViewer(g.url, g.name);
+  $("#gameGrid").appendChild(t);
+});
+
+// apps
+function renderApps(){
+  const apps = store.get("apps", DEFAULT_APPS);
+  $("#appGrid").innerHTML = "";
+  apps.forEach((a, i) => {
+    const t = document.createElement("button");
+    t.className = "tile";
+    t.innerHTML = "<span></span><small></small>";
+    t.firstChild.textContent = a.name;
+    t.lastChild.textContent = new URL(a.url).hostname;
+    t.onclick = () => openViewer(a.url, a.name);
+    t.oncontextmenu = e => { e.preventDefault(); if (confirm("Remove " + a.name + "?")) { apps.splice(i, 1); store.set("apps", apps); renderApps(); } };
+    $("#appGrid").appendChild(t);
+  });
+}
+$("#appAdd").onclick = () => {
+  const name = $("#appName").value.trim();
+  const url = normalize($("#appUrl").value);
+  if (!name || !url) return;
+  try { new URL(url); } catch(e){ return; }
+  const apps = store.get("apps", DEFAULT_APPS);
+  apps.push({ name, url });
+  store.set("apps", apps);
+  $("#appName").value = ""; $("#appUrl").value = "";
+  renderApps();
+};
+renderApps();
+
+// url launcher
+$("#urlGo").onclick = () => { const u = normalize($("#urlIn").value); if (u) openViewer(u); };
+$("#urlIn").addEventListener("keydown", e => { if (e.key === "Enter") $("#urlGo").click(); });
+
+// youtube
+function ytEmbed(raw){
+  try {
+    const u = new URL(normalize(raw));
+    const list = u.searchParams.get("list");
+    let id = u.searchParams.get("v");
+    if (u.hostname === "youtu.be") id = u.pathname.slice(1);
+    if (u.pathname.startsWith("/shorts/") || u.pathname.startsWith("/embed/")) id = u.pathname.split("/")[2];
+    if (id) return "https://www.youtube.com/embed/" + id + (list ? "?list=" + list : "");
+    if (list) return "https://www.youtube.com/embed/videoseries?list=" + list;
+  } catch(e){}
+  return "";
+}
+$("#ytGo").onclick = () => { const e = ytEmbed($("#ytIn").value); if (e) $("#ytFrame").src = e; };
+$("#ytIn").addEventListener("keydown", e => { if (e.key === "Enter") $("#ytGo").click(); });
+
+// spotify
+function spEmbed(raw){
+  try {
+    const u = new URL(normalize(raw));
+    if (!u.hostname.endsWith("spotify.com")) return "";
+    const p = u.pathname.replace(/^\/intl-[a-z-]+/i, "");
+    return "https://open.spotify.com/embed" + p.replace(/^\/embed/, "");
+  } catch(e){ return ""; }
+}
+$("#spGo").onclick = () => { const e = spEmbed($("#spIn").value); if (e) $("#spFrame").src = e; };
+$("#spIn").addEventListener("keydown", e => { if (e.key === "Enter") $("#spGo").click(); });
+$("#spFrame").src = "https://open.spotify.com/embed/playlist/37i9dQZF1DXcBWIGoYBM5M";
+
+// about:blank pop out
+$("#popout").onclick = () => {
+  const w = window.open("about:blank", "_blank");
+  if (!w) { alert("Pop-up blocked. Allow pop-ups for this site and try again."); return; }
+  const d = w.document;
+  d.title = document.title;
+  d.body.style.cssText = "margin:0;height:100vh;overflow:hidden";
+  const f = d.createElement("iframe");
+  f.src = location.href;
+  f.style.cssText = "border:0;width:100%;height:100%";
+  f.allow = "fullscreen; autoplay; gamepad; encrypted-media";
+  d.body.appendChild(f);
+};
+
+// tab title and icon
+$("#cloak").onclick = () => {
+  const t = prompt("Tab title:", document.title);
+  if (t) document.title = t;
+};
+</script>
+</body>
+</html>
